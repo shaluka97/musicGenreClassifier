@@ -1,5 +1,11 @@
 import os
 import sys
+from pyspark.sql import SparkSession
+from pyspark.ml import Pipeline, PipelineModel
+from pyspark.ml.feature import RegexTokenizer, StopWordsRemover, HashingTF, IDF, StringIndexer, StringIndexerModel
+from pyspark.ml.classification import RandomForestClassifier
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.sql.functions import lower, col
 
 # Set environment variables for Java security on macOS
 os.environ['PYSPARK_SUBMIT_ARGS'] = '--conf spark.driver.extraJavaOptions="-Djava.security.manager=allow" pyspark-shell'
@@ -10,16 +16,9 @@ try:
     import findspark
 
     findspark.init()
+
 except ImportError:
     print("Note: findspark not found. This is fine if your PySpark setup is already configured.")
-
-from pyspark.sql import SparkSession
-from pyspark.ml import Pipeline, PipelineModel
-from pyspark.ml.feature import RegexTokenizer, StopWordsRemover, HashingTF, IDF, StringIndexer, StringIndexerModel
-from pyspark.ml.classification import RandomForestClassifier
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-from pyspark.sql.functions import lower, col
-
 
 def create_pipeline():
     """Creates and returns the ML pipeline for text classification."""
@@ -31,7 +30,6 @@ def create_pipeline():
     classifier = RandomForestClassifier(labelCol="label", featuresCol="features", numTrees=100)
 
     return Pipeline(stages=[tokenizer, remover, hashing_tf, idf, indexer, classifier])
-
 
 def train_mendeley_model():
     """
@@ -115,7 +113,6 @@ def train_mendeley_model():
 
     return model
 
-
 def train_merged_model():
     """
     Trains a music genre classification model using the merged dataset (8 genres).
@@ -198,7 +195,6 @@ def train_merged_model():
 
     return model
 
-
 def predict_genre(lyrics, model_path="Generated Directories/trained_model"):
     """
     Predicts the genre of the given lyrics using the trained model.
@@ -261,7 +257,6 @@ def predict_genre(lyrics, model_path="Generated Directories/trained_model"):
         print(f"Error making prediction: {e}")
         return {"error": "Failed to make prediction"}
 
-
 def merge_datasets():
     """
     Merges the Mendeley dataset and Student dataset to create the Merged dataset.
@@ -320,7 +315,6 @@ def merge_datasets():
         print(f"Error merging datasets: {e}")
         return False
 
-
 def train_models():
     """Main function to train both models in sequence as required."""
     # First, train on Mendeley dataset (7 genres)
@@ -341,7 +335,6 @@ def train_models():
     print("2. trained_model - Trained on all 8 genres (including your custom genre)")
 
     return True
-
 
 if __name__ == "__main__":
     # Check if we need to merge datasets
