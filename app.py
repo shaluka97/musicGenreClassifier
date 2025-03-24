@@ -3,7 +3,6 @@ from music_genre_classifier import predict_genre
 import os
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -12,16 +11,12 @@ app = Flask(__name__, template_folder='templates')
 
 @app.route('/')
 def index():
-    """Render the main page with the classification form."""
-    # Check if model exists
     model_exists = os.path.exists("Trained_Final_Model")
-
     return render_template('index.html', model_exists=model_exists)
 
 
 @app.route('/classify', methods=['POST'])
 def classify():
-    """Handle the classification request and return the results as JSON."""
     lyrics = request.form.get('lyrics', '')
 
     if not lyrics:
@@ -30,7 +25,6 @@ def classify():
 
     logger.info(f"Classification request received with {len(lyrics)} characters")
 
-    # Get genre predictions
     try:
         genre_probabilities = predict_genre(lyrics, "Trained_Final_Model")
 
@@ -46,17 +40,14 @@ def classify():
 
 
 if __name__ == '__main__':
-    # Ensure the trained model exists
     if not os.path.exists("Trained_Final_Model"):
         logger.error("No model found. Please run music_genre_classifier.py first")
         print("Error: No model found. Please run music_genre_classifier.py first")
         exit(1)
 
-    # Create templates directory if it doesn't exist
     if not os.path.exists("templates"):
         os.makedirs("templates")
 
-    # Create index.html if it doesn't exist
     if not os.path.exists("templates/index.html"):
         logger.info("Creating index.html template")
         with open("templates/index.html", "w") as f:
@@ -155,7 +146,6 @@ if __name__ == '__main__':
                 return;
             }
 
-            // Show loading indicator
             document.getElementById('loading').style.display = 'block';
             if (chart) {
                 chart.destroy();
@@ -172,7 +162,6 @@ if __name__ == '__main__':
             })
             .then(response => response.json())
             .then(data => {
-                // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
 
                 if (data.error) {
@@ -183,9 +172,7 @@ if __name__ == '__main__':
                 displayResults(data);
             })
             .catch(error => {
-                // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
-
                 console.error('Error:', error);
                 alert('An error occurred during classification');
             });
@@ -195,7 +182,6 @@ if __name__ == '__main__':
             const genres = Object.keys(data);
             const probabilities = Object.values(data);
 
-            // Find the genre with the highest probability
             let maxProb = 0;
             let predictedGenre = '';
             genres.forEach((genre, index) => {
@@ -205,18 +191,15 @@ if __name__ == '__main__':
                 }
             });
 
-            // Display the predicted genre
             document.getElementById('predicted-genre').textContent = 
                 `Predicted Genre: ${predictedGenre} (${(maxProb * 100).toFixed(2)}%)`;
 
-            // Sort data by probability
             const sortedIndices = probabilities.map((prob, index) => index)
                 .sort((a, b) => probabilities[b] - probabilities[a]);
 
             const sortedGenres = sortedIndices.map(i => genres[i]);
             const sortedProbabilities = sortedIndices.map(i => probabilities[i]);
 
-            // Create chart
             const ctx = document.getElementById('genreChart').getContext('2d');
             chart = new Chart(ctx, {
                 type: 'bar',
@@ -224,7 +207,7 @@ if __name__ == '__main__':
                     labels: sortedGenres,
                     datasets: [{
                         label: 'Probability',
-                        data: sortedProbabilities.map(p => p * 100), // Convert to percentage
+                        data: sortedProbabilities.map(p => p * 100),
                         backgroundColor: [
                             'rgba(255, 99, 132, 0.7)',
                             'rgba(54, 162, 235, 0.7)',

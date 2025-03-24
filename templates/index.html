@@ -93,7 +93,6 @@
                 return;
             }
 
-            // Show loading indicator
             document.getElementById('loading').style.display = 'block';
             if (chart) {
                 chart.destroy();
@@ -110,7 +109,6 @@
             })
             .then(response => response.json())
             .then(data => {
-                // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
 
                 if (data.error) {
@@ -121,9 +119,7 @@
                 displayResults(data);
             })
             .catch(error => {
-                // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
-
                 console.error('Error:', error);
                 alert('An error occurred during classification');
             });
@@ -133,7 +129,6 @@
             const genres = Object.keys(data);
             const probabilities = Object.values(data);
 
-            // Find the genre with the highest probability
             let maxProb = 0;
             let predictedGenre = '';
             genres.forEach((genre, index) => {
@@ -143,18 +138,15 @@
                 }
             });
 
-            // Display the predicted genre
             document.getElementById('predicted-genre').textContent = 
                 `Predicted Genre: ${predictedGenre} (${(maxProb * 100).toFixed(2)}%)`;
 
-            // Sort data by probability
             const sortedIndices = probabilities.map((prob, index) => index)
                 .sort((a, b) => probabilities[b] - probabilities[a]);
 
             const sortedGenres = sortedIndices.map(i => genres[i]);
             const sortedProbabilities = sortedIndices.map(i => probabilities[i]);
 
-            // Create chart
             const ctx = document.getElementById('genreChart').getContext('2d');
             chart = new Chart(ctx, {
                 type: 'bar',
@@ -162,7 +154,7 @@
                     labels: sortedGenres,
                     datasets: [{
                         label: 'Probability',
-                        data: sortedProbabilities.map(p => p * 100), // Convert to percentage
+                        data: sortedProbabilities.map(p => p * 100),
                         backgroundColor: [
                             'rgba(255, 99, 132, 0.7)',
                             'rgba(54, 162, 235, 0.7)',
