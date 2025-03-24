@@ -14,9 +14,7 @@ os.environ['JAVA_OPTS'] = '-Djava.security.manager=allow'
 # Try to import findspark if available (helps locate Spark installation)
 try:
     import findspark
-
     findspark.init()
-
 except ImportError:
     print("Note: findspark not found. This is fine if your PySpark setup is already configured.")
 
@@ -31,99 +29,17 @@ def create_pipeline():
 
     return Pipeline(stages=[tokenizer, remover, hashing_tf, idf, indexer, classifier])
 
-def train_mendeley_model():
-    """
-    Trains a music genre classification model using ONLY the Mendeley dataset (7 genres).
-    Saves the trained model to disk.
-    """
-    print("\n=== STAGE 1: TRAINING MODEL ON MENDELEY DATASET (7 GENRES) ===\n")
-    print("Initializing Spark session...")
-    # Initialize Spark session with simplified configuration for macOS compatibility
-    try:
-        spark = SparkSession.builder \
-            .appName("Music Genre Classification - Mendeley") \
-            .master("local[*]") \
-            .config("spark.driver.extraJavaOptions", "-Djava.security.manager=allow") \
-            .config("spark.executor.extraJavaOptions", "-Djava.security.manager=allow") \
-            .config("spark.ui.enabled", "false") \
-            .config("spark.sql.shuffle.partitions", "10") \
-            .getOrCreate()
-    except Exception as e:
-        print(f"Error initializing Spark: {e}")
-        print("\nTrying alternative Spark initialization...")
-
-        # Fallback to minimal configuration
-        spark = SparkSession.builder \
-            .appName("Music Genre Classification") \
-            .master("local[*]") \
-            .config("spark.driver.allowMultipleContexts", "true") \
-            .getOrCreate()
-
-    # Load the Mendeley dataset
-    print("Loading Mendeley dataset...")
-    try:
-        mendeley_data = spark.read \
-            .option("header", "true") \
-            .option("inferSchema", "true") \
-            .csv("Data Files/Mendeley_dataset.csv")
-
-        # Verify that we have the expected columns
-        required_columns = ["artist_name", "track_name", "release_date", "genre", "lyrics"]
-        for column in required_columns:
-            if column not in mendeley_data.columns:
-                raise Exception(f"Missing required column: {column}")
-
-        # Check for the number of unique genres
-        num_genres = mendeley_data.select("genre").distinct().count()
-        print(f"Number of unique genres in the Mendeley dataset: {num_genres}")
-        genres = [row.genre for row in mendeley_data.select("genre").distinct().collect()]
-        print(f"Genres in the Mendeley dataset: {', '.join(genres)}")
-
-    except Exception as e:
-        print(f"Error loading Mendeley dataset: {e}")
-        return None
-
-    # Prepare the data
-    print("Preprocessing data...")
-    clean_data = mendeley_data.withColumn("lyrics", lower(col("lyrics")))
-
-    # Split the data into training and test sets
-    training_data, test_data = clean_data.randomSplit([0.8, 0.2], seed=42)
-    print(f"Training data size: {training_data.count()}, Test data size: {test_data.count()}")
-
-    # Create the ML pipeline
-    print("Building ML pipeline...")
-    pipeline = create_pipeline()
-
-    # Train the model
-    print("Training model on Mendeley dataset... (this may take a few minutes)")
-    model = pipeline.fit(training_data)
-
-    # Evaluate the model
-    print("Evaluating model performance...")
-    predictions = model.transform(test_data)
-    evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction", metricName="accuracy")
-    accuracy = evaluator.evaluate(predictions)
-    print(f"Test accuracy (Mendeley model): {accuracy}")
-
-    # Save the model
-    print("Saving Mendeley model...")
-    model.write().overwrite().save("Generated Directories/mendeley_model")
-    print("Mendeley model training complete!")
-
-    return model
-
 def train_merged_model():
     """
-    Trains a music genre classification model using the merged dataset (8 genres).
-    Saves the trained model to disk.
+    Trains a music genre classification model using the merged dataset.
+    Saves the trained model to disk in the Trained_Final_Model directory.
     """
-    print("\n=== STAGE 2: TRAINING MODEL ON MERGED DATASET (8 GENRES) ===\n")
+    print("\n=== TRAINING MODEL ON MERGED DATASET ===\n")
     print("Initializing Spark session...")
     # Initialize Spark session with simplified configuration for macOS compatibility
     try:
         spark = SparkSession.builder \
-            .appName("Music Genre Classification - Merged") \
+            .appName("Music Genre Classification") \
             .master("local[*]") \
             .config("spark.driver.extraJavaOptions", "-Djava.security.manager=allow") \
             .config("spark.executor.extraJavaOptions", "-Djava.security.manager=allow") \
@@ -147,7 +63,7 @@ def train_merged_model():
         merged_data = spark.read \
             .option("header", "true") \
             .option("inferSchema", "true") \
-            .csv("Data Files/Merged_dataset.csv")
+            .csv("Merged_dataset.csv")
 
         # Verify that we have the expected columns
         required_columns = ["artist_name", "track_name", "release_date", "genre", "lyrics"]
@@ -186,16 +102,17 @@ def train_merged_model():
     predictions = model.transform(test_data)
     evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction", metricName="accuracy")
     accuracy = evaluator.evaluate(predictions)
-    print(f"Test accuracy (Merged model): {accuracy}")
+    print(f"Test accuracy: {accuracy}")
 
     # Save the model
-    print("Saving merged model...")
-    model.write().overwrite().save("Generated Directories/trained_model")
-    print("Merged model training complete!")
+    print("Saving model...")
+    os.makedirs("Trained_Final_Model", exist_ok=True)
+    model.write().overwrite().save("Trained_Final_Model")
+    print("Model training complete!")
 
     return model
 
-def predict_genre(lyrics, model_path="Generated Directories/trained_model"):
+def predict_genre(lyrics, model_path="Trained_Final_Model"):
     """
     Predicts the genre of the given lyrics using the trained model.
     Returns a dictionary of genre probabilities.
@@ -259,27 +176,24 @@ def predict_genre(lyrics, model_path="Generated Directories/trained_model"):
 
 def merge_datasets():
     """
-    Merges the Mendeley dataset and Student dataset to create the Merged dataset.
+    Merges the Mendeley dataset and Student dataset to create the Merged dataset
+    in the root directory.
     """
     import pandas as pd
 
     try:
-        # Create directories if they don't exist
-        os.makedirs("Data Files", exist_ok=True)
-        os.makedirs("Generated Directories", exist_ok=True)
-
         # Check if files exist
-        if not os.path.exists("Data Files/Mendeley_dataset.csv"):
-            print("Error: Data Files/Mendeley_dataset.csv not found")
+        if not os.path.exists("Mendeley_dataset.csv"):
+            print("Error: Mendeley_dataset.csv not found")
             return False
 
-        if not os.path.exists("Data Files/Student_dataset.csv"):
-            print("Error: Data Files/Student_dataset.csv not found")
+        if not os.path.exists("Student_dataset.csv"):
+            print("Error: Student_dataset.csv not found")
             return False
 
         print("Loading datasets...")
-        mendeley = pd.read_csv("Data Files/Mendeley_dataset.csv")
-        student = pd.read_csv("Data Files/Student_dataset.csv")
+        mendeley = pd.read_csv("Mendeley_dataset.csv")
+        student = pd.read_csv("Student_dataset.csv")
 
         # Ensure we only keep the required columns
         columns = ["artist_name", "track_name", "release_date", "genre", "lyrics"]
@@ -300,8 +214,8 @@ def merge_datasets():
         print("Merging datasets...")
         merged = pd.concat([mendeley, student], ignore_index=True)
 
-        # Save merged dataset
-        merged.to_csv("Data Files/Merged_dataset.csv", index=False)
+        # Save merged dataset to root directory
+        merged.to_csv("Merged_dataset.csv", index=False)
         print(f"Merged dataset created with {len(merged)} rows")
 
         # Report genre counts
@@ -315,42 +229,21 @@ def merge_datasets():
         print(f"Error merging datasets: {e}")
         return False
 
-def train_models():
-    """Main function to train both models in sequence as required."""
-    # First, train on Mendeley dataset (7 genres)
-    mendeley_model = train_mendeley_model()
-    if mendeley_model is None:
-        print("Failed to train Mendeley model. Exiting.")
-        return False
-
-    # Then, train on Merged dataset (8 genres)
-    merged_model = train_merged_model()
-    if merged_model is None:
-        print("Failed to train Merged model. Exiting.")
-        return False
-
-    print("\n=== MODEL TRAINING COMPLETE ===")
-    print("Two models have been created:")
-    print("1. mendeley_model - Trained on original 7 genres")
-    print("2. trained_model - Trained on all 8 genres (including your custom genre)")
-
-    return True
-
 if __name__ == "__main__":
     # Check if we need to merge datasets
-    if not os.path.exists("Data Files/Merged_dataset.csv"):
+    if not os.path.exists("Merged_dataset.csv"):
         print("Merged dataset not found. Creating it now...")
         success = merge_datasets()
         if not success:
             print("Failed to create merged dataset. Exiting.")
             exit(1)
 
-    # Check if both models already exist
-    if os.path.exists("Generated Directories/mendeley_model") and os.path.exists("Generated Directories/trained_model"):
-        print("Both models already exist. Using existing models.")
+    # Check if model already exists
+    if os.path.exists("Trained_Final_Model"):
+        print("Model already exists. Using existing model.")
     else:
-        print("Training models...")
-        success = train_models()
-        if not success:
-            print("Failed to train models. Exiting.")
+        print("Training model...")
+        model = train_merged_model()
+        if model is None:
+            print("Failed to train model. Exiting.")
             exit(1)
