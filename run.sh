@@ -10,7 +10,7 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 echo "Checking and installing required packages..."
-PACKAGES=("flask" "pyspark" "findspark")
+PACKAGES=("flask" "pyspark" "findspark" "numpy")
 
 for package in "${PACKAGES[@]}"; do
     python3 -c "import $package" 2>/dev/null
